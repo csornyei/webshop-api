@@ -1,5 +1,6 @@
 import supertest from "supertest";
 import app from "../../app";
+import { listProducts } from "../../controllers/product";
 
 describe("Products route tests", () => {
   describe("GET /api/products", () => {
@@ -13,7 +14,11 @@ describe("Products route tests", () => {
       const response = await supertest(app).get("/api/products");
 
       expect(response.body.length).toEqual(20);
-      // TODO: check products
+      expect(
+        response.body.every(
+          (product: any) => product.name && product.id && product.price > 0
+        )
+      ).toBeTruthy();
     });
 
     it("should responde with a list of products with a limit", async () => {
@@ -30,40 +35,33 @@ describe("Products route tests", () => {
       expect(response.body.length).toEqual(5);
     });
 
-    it("should responde with a list of products filtered by category", async () => {
-      const response = await supertest(app).get("/api/products?category=fruit");
-
-      expect(response.body.length).toEqual(10);
-    });
-
     it("should responde with a list of products filtered by name", async () => {
-      const response = await supertest(app).get("/api/products?name=apple");
+      const response = await supertest(app).get("/api/products?q=apple");
 
-      expect(response.body.length).toEqual(2);
-    });
-
-    it("should responde with a list of products filtered by name and category", async () => {
-      const response = await supertest(app).get(
-        "/api/products?name=apple&category=fruit"
-      );
-
-      expect(response.body.length).toEqual(1);
+      expect(response.body.length).toEqual(4);
     });
   });
 
   describe("GET /api/products/:id", () => {
+    let productId: string;
+
+    beforeAll(async () => {
+      const apple = await listProducts(1, 0, "Red Apple");
+      productId = apple[0].id!;
+    });
+
     it("should responde", async () => {
-      const response = await supertest(app).get("/api/products/1");
+      const response = await supertest(app).get(`/api/products/${productId}`);
 
       expect(response.status).toBe(200);
     });
 
     it("should responde with a product", async () => {
-      const response = await supertest(app).get("/api/products/1");
+      const response = await supertest(app).get(`/api/products/${productId}`);
 
-      expect(response.body.id).toEqual(1);
-      expect(response.body.name).toEqual("Apple");
-      expect(response.body.category).toEqual("fruit");
+      expect(response.body.name).toEqual("Red apple");
+      expect(response.body.category.name).toEqual("Apples");
+      expect(response.body.description).toEqual("A delicious red apple");
       expect(response.body.price).toEqual(1.5);
     });
 

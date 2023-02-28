@@ -2,27 +2,33 @@ import { Router, Request, Response } from "express";
 import { createNewCart } from "../controllers/cart";
 import { filterExistingProducts } from "../controllers/product";
 import { BadRequestError } from "../error/errors";
+import { createCartSchema } from "../validation/schemas";
+import { validatationHandler } from "../validation/validationMiddleware";
 
 const router = Router();
 
-router.post("/", async (req: Request, res: Response) => {
-  const { items }: { items: { productId: string; quantity: number }[] } =
-    req.body;
+router.post(
+  "/",
+  validatationHandler(createCartSchema),
+  async (req: Request, res: Response) => {
+    const { items }: { items: { productId: string; quantity: number }[] } =
+      req.body;
 
-  if (!items || !items.length) {
-    throw new BadRequestError("Items are required");
+    if (!items || !items.length) {
+      throw new BadRequestError("Items are required");
+    }
+
+    const existingItems = await filterExistingProducts(items);
+
+    if (existingItems.length === 0) {
+      throw new BadRequestError("No valid items");
+    }
+
+    const cart = await createNewCart(existingItems);
+
+    res.send(cart);
   }
-
-  const existingItems = await filterExistingProducts(items);
-
-  if (existingItems.length === 0) {
-    throw new BadRequestError("No valid items");
-  }
-
-  const cart = await createNewCart(existingItems);
-
-  res.send(cart);
-});
+);
 
 router.get("/:id", (req: Request, res: Response) => {
   // get order details

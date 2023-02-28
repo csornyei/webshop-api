@@ -1,3 +1,5 @@
+import { ZodIssue } from "zod";
+
 export abstract class BaseError extends Error {
   abstract statusCode: number;
 
@@ -35,5 +37,21 @@ export class BadRequestError extends BaseError {
 
   serializeErrors() {
     return [{ message: this.message }];
+  }
+}
+
+export class RequestValidationError extends BaseError {
+  statusCode = 400;
+
+  constructor(private errors: ZodIssue[]) {
+    super("Validation error");
+
+    Object.setPrototypeOf(this, RequestValidationError.prototype);
+  }
+
+  serializeErrors() {
+    return this.errors.map((error) => {
+      return { message: error.message, fields: error.path };
+    });
   }
 }

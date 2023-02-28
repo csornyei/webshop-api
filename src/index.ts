@@ -1,5 +1,6 @@
 import dotenv from "dotenv";
 import app from "./app";
+import logger from "./log/logger";
 
 dotenv.config();
 
@@ -15,7 +16,7 @@ const start = () => {
   const { PORT } = process.env;
 
   app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+    logger.info(`Server is listening on port ${PORT}`);
   });
 };
 

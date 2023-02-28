@@ -50,3 +50,19 @@ export async function getProduct(id: string) {
 
   return convertPrice(product);
 }
+
+export async function filterExistingProducts(
+  items: { productId: string; quantity: number }[]
+) {
+  const products = await prisma.product.findMany({
+    where: {
+      id: {
+        in: items.map((item) => item.productId),
+      },
+    },
+  });
+
+  return items.filter(
+    (product) => products.findIndex((p) => p.id === product.productId) !== -1
+  );
+}

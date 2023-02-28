@@ -25,4 +25,30 @@ model Product {
   categoryId  String
 
   category Category @relation(fields: [categoryId], references: [id])
+
+  CartEntries CartEntries[]
+}
+
+enum CartStatus {
+  OPEN
+  SENT
+  CANCELLED
+  PAID
+}
+
+model Cart {
+  id String @id @default(cuid())
+
+  status      CartStatus    @default(OPEN)
+  CartEntries CartEntries[]
+}
+
+model CartEntries {
+  id        String @id @default(cuid())
+  productId String
+  quantity  Int
+  cartId    String
+
+  product Product @relation(fields: [productId], references: [id])
+  cart    Cart    @relation(fields: [cartId], references: [id])
 }

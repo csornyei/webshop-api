@@ -1,6 +1,5 @@
 import { Router, Request, Response } from "express";
 import { getProduct, listProducts } from "../controllers/product";
-import prisma from "../database";
 
 const router = Router();
 

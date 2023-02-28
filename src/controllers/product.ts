@@ -1,5 +1,6 @@
 import { Product } from "@prisma/client";
 import prisma from "../database";
+import { NotFoundError } from "../error/errors";
 
 function convertPrice(product: Partial<Product>) {
   return {
@@ -44,7 +45,7 @@ export async function getProduct(id: string) {
   });
 
   if (!product) {
-    throw new Error("Product not found");
+    throw new NotFoundError();
   }
 
   return convertPrice(product);

@@ -40,5 +40,8 @@
     "ignore": [
       "src/**/*.test.ts"
     ]
+  },
+  "prisma": {
+    "seed": "ts-node prisma/seed.ts"
   }
 }

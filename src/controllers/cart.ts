@@ -1,5 +1,6 @@
 import prisma from "../database";
 import { BadRequestError, NotFoundError } from "../error/errors";
+import logger from "../log/logger";
 import { calculatePrice, filterExistingProducts } from "./product";
 
 export async function createNewCart(
@@ -36,6 +37,8 @@ export async function createNewCart(
   });
 
   const price = await calculatePrice(cart.CartEntries);
+
+  logger.log("event", `cart_created: ${cart.id}`);
 
   return { ...cart, price };
 }
@@ -161,6 +164,21 @@ export async function updateCart(
 
   const price = await calculatePrice(cart.CartEntries);
 
+  removeItems.forEach((item) => {
+    logger.log("event", `cart_item_removed: ${item}`);
+  });
+
+  updateItems.forEach((item) => {
+    logger.log(
+      "event",
+      `cart_item_updated: ${item.productId} ${item.quantity}`
+    );
+  });
+
+  newItems.forEach((item) => {
+    logger.log("event", `cart_item_added: ${item.productId} ${item.quantity}`);
+  });
+
   return { ...cart, price };
 }
 
@@ -188,6 +206,8 @@ export async function cancelCart(id: string) {
       },
     },
   });
+
+  logger.log("event", `cart_cancelled: ${cart.id}`);
 
   return { ...cart };
 }
@@ -218,6 +238,8 @@ export async function checkoutCart(id: string) {
   });
 
   const price = await calculatePrice(cart.CartEntries);
+
+  logger.log("event", `cart_checked_out: ${cart.id}`);
 
   return { ...cart, price };
 }

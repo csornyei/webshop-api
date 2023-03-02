@@ -3,20 +3,22 @@ import winston from "winston";
 const levels = {
   error: 0,
   warn: 1,
-  info: 2,
-  http: 3,
-  debug: 4,
+  event: 2,
+  info: 3,
+  http: 4,
+  debug: 5,
 };
 
 const level = () => {
   const env = process.env.NODE_ENV || "development";
   const isDevelopment = env === "development";
-  return isDevelopment ? "debug" : "warn";
+  return isDevelopment ? "debug" : "event";
 };
 
 const colors = {
   error: "red",
   warn: "yellow",
+  event: "cyan",
   info: "green",
   http: "magenta",
   debug: "white",

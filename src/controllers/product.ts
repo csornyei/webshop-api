@@ -66,3 +66,20 @@ export async function filterExistingProducts(
     (product) => products.findIndex((p) => p.id === product.productId) !== -1
   );
 }
+
+export async function calculatePrice(
+  items: {
+    product: {
+      name: string;
+      price: number;
+    };
+    productId: string;
+    quantity: number;
+  }[]
+) {
+  return items.reduce((total, item) => {
+    const { product } = item;
+
+    return total + convertPrice(product).price * item.quantity;
+  }, 0);
+}

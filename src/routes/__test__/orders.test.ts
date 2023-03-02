@@ -46,10 +46,15 @@ describe("Orders route tests", () => {
         status: "OPEN",
         CartEntries: expect.arrayContaining([
           expect.objectContaining({
+            product: expect.objectContaining({
+              name: expect.any(String),
+              price: expect.any(Number),
+            }),
             productId: expect.any(String),
             quantity: expect.any(Number),
           }),
         ]),
+        price: expect.any(Number),
       });
     });
 
@@ -74,10 +79,15 @@ describe("Orders route tests", () => {
         status: "OPEN",
         CartEntries: expect.arrayContaining([
           expect.objectContaining({
+            product: expect.objectContaining({
+              name: expect.any(String),
+              price: expect.any(Number),
+            }),
             productId: expect.any(String),
             quantity: expect.any(Number),
           }),
         ]),
+        price: expect.any(Number),
       });
       expect(response.body.CartEntries.length).toBe(products.length);
     });
@@ -110,6 +120,10 @@ describe("Orders route tests", () => {
         status: "OPEN",
         CartEntries: expect.arrayContaining([
           expect.objectContaining({
+            product: expect.objectContaining({
+              name: expect.any(String),
+              price: expect.any(Number),
+            }),
             productId: expect.any(String),
             quantity: expect.any(Number),
           }),
@@ -158,16 +172,16 @@ describe("Orders route tests", () => {
             },
           ],
         });
-
       expect(response.status).toBe(200);
       const updatedEntry = response.body.CartEntries.find(
         (entry: any) => entry.productId === oldEntry.productId
       );
+      expect(updatedEntry).toBeDefined();
       expect(updatedEntry.quantity).toBe(oldEntry.quantity + 1);
     });
 
     it("updates a cart by adding new products", async () => {
-      const products = await listProducts(1, 5, "");
+      const products = await listProducts(1, 10, "");
 
       const product = products[0];
 
@@ -231,11 +245,16 @@ describe("Orders route tests", () => {
       expect(response.status).toBe(404);
     });
 
-    it("returns 400 if product does not exist", async () => {
+    it("only updates existing products", async () => {
+      const products = await listProducts(1, 10, "");
       const response = await supertest(app)
         .patch(`/api/orders/${cartId}`)
         .send({
           items: [
+            {
+              productId: products[0].id,
+              quantity: 1,
+            },
             {
               productId: "some-product-id",
               quantity: 1,
@@ -243,7 +262,18 @@ describe("Orders route tests", () => {
           ],
         });
 
-      expect(response.status).toBe(400);
+      expect(response.status).toBe(200);
+      expect(response.body.CartEntries.length).toBe(6);
+      expect(
+        response.body.CartEntries.find(
+          (entry: any) => entry.productId === products[0].id
+        )
+      ).toBeDefined();
+      expect(
+        response.body.CartEntries.find(
+          (entry: any) => entry.productId === "some-product-id"
+        )
+      ).toBeUndefined();
     });
   });
 
@@ -274,6 +304,10 @@ describe("Orders route tests", () => {
         status: "CANCELLED",
         CartEntries: expect.arrayContaining([
           expect.objectContaining({
+            product: expect.objectContaining({
+              name: expect.any(String),
+              price: expect.any(Number),
+            }),
             productId: expect.any(String),
             quantity: expect.any(Number),
           }),
@@ -321,6 +355,10 @@ describe("Orders route tests", () => {
         status: "SENT",
         CartEntries: expect.arrayContaining([
           expect.objectContaining({
+            product: expect.objectContaining({
+              name: expect.any(String),
+              price: expect.any(Number),
+            }),
             productId: expect.any(String),
             quantity: expect.any(Number),
           }),
@@ -340,7 +378,7 @@ describe("Orders route tests", () => {
     it("returns 400 if cart is empty", async () => {
       const originalOrder = await supertest(app).get(`/api/orders/${cartId}`);
 
-      await supertest(app)
+      const deleteEntrierResponse = await supertest(app)
         .patch(`/api/orders/${cartId}`)
         .send({
           items: originalOrder.body.CartEntries.map((entry: any) => ({
@@ -352,8 +390,21 @@ describe("Orders route tests", () => {
       const response = await supertest(app).post(
         `/api/orders/${cartId}/checkout`
       );
-
       expect(response.status).toBe(400);
+    });
+
+    it("returns 400 if the cart not open", async () => {
+      const firstResponse = await supertest(app).post(
+        `/api/orders/${cartId}/checkout`
+      );
+
+      expect(firstResponse.status).toBe(200);
+
+      const secondResponse = await supertest(app).post(
+        `/api/orders/${cartId}/checkout`
+      );
+
+      expect(secondResponse.status).toBe(400);
     });
 
     it("returns 400 for updating the cart after checkout", async () => {

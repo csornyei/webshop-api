@@ -1,8 +1,13 @@
 import { User } from "@prisma/client";
 import argon2 from "argon2";
+import { Request } from "express";
 import jwt from "jsonwebtoken";
 import prisma from "../database";
-import { BadRequestError, NotFoundError } from "../error/errors";
+import {
+  BadRequestError,
+  NotFoundError,
+  UnauthorizedError,
+} from "../error/errors";
 
 export const registerUser = async (email: string, password: string) => {
   const userExists = await prisma.user.findUnique({
@@ -49,6 +54,22 @@ export const createToken = (user: User) => {
   );
 
   return token;
+};
+
+export const getTokenFromRequest = (req: Request) => {
+  const { authorization } = req.headers;
+  if (!authorization) {
+    throw new UnauthorizedError();
+  }
+
+  const token = authorization.split(" ")[1];
+
+  const payload = jwt.verify(token, process.env.JWT_SECRET!) as {
+    id: string;
+    email: string;
+  };
+
+  return payload;
 };
 
 const hashPassword = async (password: string) => {

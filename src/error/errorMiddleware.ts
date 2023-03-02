@@ -3,9 +3,9 @@ import { BaseError } from "./errors";
 
 export function errorHandler(
   err: Error,
-  req: Request,
+  _: Request,
   res: Response,
-  _: NextFunction
+  __: NextFunction
 ) {
   if (err instanceof BaseError) {
     return res.status(err.statusCode).send({ errors: err.serializeErrors() });

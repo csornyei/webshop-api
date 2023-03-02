@@ -1,19 +1,74 @@
 import supertest from "supertest";
+import argon2 from "argon2";
 import app from "../../app";
 import { listProducts } from "../../controllers/product";
 import prisma from "../../database";
 
+const getAuthHeader = async (email = "test@test.com") => {
+  const { body } = await supertest(app).post("/api/auth/login").send({
+    email,
+    password: "Test123456789",
+  });
+
+  return `Bearer ${body.token}`;
+};
+
 describe("Orders route tests", () => {
   beforeAll(async () => {
-    prisma.cart.deleteMany();
-    prisma.cartEntries.deleteMany();
+    await prisma.cart.deleteMany();
+    await prisma.cartEntries.deleteMany();
+
+    const password = await argon2.hash("Test123456789");
+    await prisma.user.upsert({
+      where: {
+        email: "test@test.com",
+      },
+      update: {
+        email: "test@test.com",
+        password,
+        Cart: undefined,
+      },
+      create: {
+        email: "test@test.com",
+        password,
+        Cart: undefined,
+      },
+    });
+
+    await prisma.user.upsert({
+      where: {
+        email: "test2@test.com",
+      },
+      update: {
+        email: "test2@test.com",
+        password,
+        Cart: undefined,
+      },
+      create: {
+        email: "test2@test.com",
+        password,
+        Cart: undefined,
+      },
+    });
   });
 
   describe("POST /api/orders", () => {
+    it("not creates a cart without authentication", async () => {
+      const response = await supertest(app)
+        .post("/api/orders")
+        .send({
+          items: [{ productId: "non-existing-product-id", quantity: 1 }],
+        });
+
+      expect(response.status).toBe(401);
+    });
     it("not creates an empty cart", async () => {
-      const response = await supertest(app).post("/api/orders").send({
-        items: [],
-      });
+      const response = await supertest(app)
+        .post("/api/orders")
+        .set("Authorization", await getAuthHeader())
+        .send({
+          items: [],
+        });
 
       expect(response.status).toBe(400);
     });
@@ -21,6 +76,7 @@ describe("Orders route tests", () => {
     it("not creates a cart with non existing products", async () => {
       const response = await supertest(app)
         .post("/api/orders")
+        .set("Authorization", await getAuthHeader())
         .send({
           items: [{ productId: "non-existing-product-id", quantity: 1 }],
         });
@@ -33,6 +89,7 @@ describe("Orders route tests", () => {
 
       const response = await supertest(app)
         .post("/api/orders")
+        .set("Authorization", await getAuthHeader())
         .send({
           items: products.map((product) => ({
             productId: product.id,
@@ -44,6 +101,7 @@ describe("Orders route tests", () => {
       expect(response.body).toEqual({
         id: expect.any(String),
         status: "OPEN",
+        userId: expect.any(String),
         CartEntries: expect.arrayContaining([
           expect.objectContaining({
             product: expect.objectContaining({
@@ -63,6 +121,7 @@ describe("Orders route tests", () => {
 
       const response = await supertest(app)
         .post("/api/orders")
+        .set("Authorization", await getAuthHeader())
         .send({
           items: [
             ...products.map((product) => ({
@@ -77,6 +136,7 @@ describe("Orders route tests", () => {
       expect(response.body).toEqual({
         id: expect.any(String),
         status: "OPEN",
+        userId: expect.any(String),
         CartEntries: expect.arrayContaining([
           expect.objectContaining({
             product: expect.objectContaining({
@@ -101,6 +161,7 @@ describe("Orders route tests", () => {
 
       const response = await supertest(app)
         .post("/api/orders")
+        .set("Authorization", await getAuthHeader())
         .send({
           items: products.map((product) => ({
             productId: product.id,
@@ -111,13 +172,22 @@ describe("Orders route tests", () => {
       cartId = response.body.id;
     });
 
-    it("returns a cart", async () => {
+    it("not returns a cart without authentication", async () => {
       const response = await supertest(app).get(`/api/orders/${cartId}`);
+
+      expect(response.status).toBe(401);
+    });
+
+    it("returns a cart", async () => {
+      const response = await supertest(app)
+        .get(`/api/orders/${cartId}`)
+        .set("Authorization", await getAuthHeader());
 
       expect(response.status).toBe(200);
       expect(response.body).toEqual({
         id: expect.any(String),
         status: "OPEN",
+        userId: expect.any(String),
         CartEntries: expect.arrayContaining([
           expect.objectContaining({
             product: expect.objectContaining({
@@ -133,9 +203,19 @@ describe("Orders route tests", () => {
     });
 
     it("returns 404 if cart does not exist", async () => {
-      const response = await supertest(app).get(`/api/orders/invalid-id`);
+      const response = await supertest(app)
+        .get(`/api/orders/invalid-id`)
+        .set("Authorization", await getAuthHeader());
 
       expect(response.status).toBe(404);
+    });
+
+    it("returns 401 if cart does not belong to user", async () => {
+      const response = await supertest(app)
+        .get(`/api/orders/${cartId}`)
+        .set("Authorization", await getAuthHeader("test2@test.com"));
+
+      expect(response.status).toBe(401);
     });
   });
 
@@ -147,6 +227,7 @@ describe("Orders route tests", () => {
 
       const response = await supertest(app)
         .post("/api/orders")
+        .set("Authorization", await getAuthHeader())
         .send({
           items: products.map((product) => ({
             productId: product.id,
@@ -157,13 +238,26 @@ describe("Orders route tests", () => {
       cartId = response.body.id;
     });
 
+    it("not updates a cart without authentication", async () => {
+      const response = await supertest(app)
+        .patch(`/api/orders/${cartId}`)
+        .send({
+          items: [{ productId: "non-existing-product-id", quantity: 1 }],
+        });
+
+      expect(response.status).toBe(401);
+    });
+
     it("updates a cart by changing amount", async () => {
-      const { body } = await supertest(app).get(`/api/orders/${cartId}`);
+      const { body } = await supertest(app)
+        .get(`/api/orders/${cartId}`)
+        .set("Authorization", await getAuthHeader());
 
       const oldEntry = { ...body.CartEntries[0] };
 
       const response = await supertest(app)
         .patch(`/api/orders/${cartId}`)
+        .set("Authorization", await getAuthHeader())
         .send({
           items: [
             {
@@ -187,6 +281,7 @@ describe("Orders route tests", () => {
 
       const response = await supertest(app)
         .patch(`/api/orders/${cartId}`)
+        .set("Authorization", await getAuthHeader())
         .send({
           items: [
             {
@@ -204,12 +299,15 @@ describe("Orders route tests", () => {
     });
 
     it("removes item by setting quantity to 0", async () => {
-      const { body } = await supertest(app).get(`/api/orders/${cartId}`);
+      const { body } = await supertest(app)
+        .get(`/api/orders/${cartId}`)
+        .set("Authorization", await getAuthHeader());
 
       const oldEntry = { ...body.CartEntries[0] };
 
       const response = await supertest(app)
         .patch(`/api/orders/${cartId}`)
+        .set("Authorization", await getAuthHeader())
         .send({
           items: [
             {
@@ -233,6 +331,7 @@ describe("Orders route tests", () => {
     it("returns 404 if cart does not exist", async () => {
       const response = await supertest(app)
         .patch(`/api/orders/invalid-id`)
+        .set("Authorization", await getAuthHeader())
         .send({
           items: [
             {
@@ -249,6 +348,7 @@ describe("Orders route tests", () => {
       const products = await listProducts(1, 10, "");
       const response = await supertest(app)
         .patch(`/api/orders/${cartId}`)
+        .set("Authorization", await getAuthHeader())
         .send({
           items: [
             {
@@ -275,6 +375,22 @@ describe("Orders route tests", () => {
         )
       ).toBeUndefined();
     });
+
+    it("returns 401 if cart does not belong to user", async () => {
+      const response = await supertest(app)
+        .patch(`/api/orders/${cartId}`)
+        .set("Authorization", await getAuthHeader("test2@test.com"))
+        .send({
+          items: [
+            {
+              productId: "some-product-id",
+              quantity: 1,
+            },
+          ],
+        });
+
+      expect(response.status).toBe(401);
+    });
   });
 
   describe("DELETE /api/orders/:id", () => {
@@ -285,6 +401,7 @@ describe("Orders route tests", () => {
 
       const response = await supertest(app)
         .post("/api/orders")
+        .set("Authorization", await getAuthHeader())
         .send({
           items: products.map((product) => ({
             productId: product.id,
@@ -295,13 +412,22 @@ describe("Orders route tests", () => {
       cartId = response.body.id;
     });
 
-    it("cancel a cart", async () => {
+    it("not cancels a cart without authentication", async () => {
       const response = await supertest(app).delete(`/api/orders/${cartId}`);
+
+      expect(response.status).toBe(401);
+    });
+
+    it("cancel a cart", async () => {
+      const response = await supertest(app)
+        .delete(`/api/orders/${cartId}`)
+        .set("Authorization", await getAuthHeader());
 
       expect(response.status).toBe(200);
       expect(response.body).toEqual({
         id: expect.any(String),
         status: "CANCELLED",
+        userId: expect.any(String),
         CartEntries: expect.arrayContaining([
           expect.objectContaining({
             product: expect.objectContaining({
@@ -314,15 +440,27 @@ describe("Orders route tests", () => {
         ]),
       });
 
-      const { body } = await supertest(app).get(`/api/orders/${cartId}`);
+      const { body } = await supertest(app)
+        .get(`/api/orders/${cartId}`)
+        .set("Authorization", await getAuthHeader());
 
       expect(body.status).toBe("CANCELLED");
     });
 
     it("returns 404 if cart does not exist", async () => {
-      const response = await supertest(app).delete(`/api/orders/invalid-id`);
+      const response = await supertest(app)
+        .delete(`/api/orders/invalid-id`)
+        .set("Authorization", await getAuthHeader());
 
       expect(response.status).toBe(404);
+    });
+
+    it("returns 401 if cart does not belong to user", async () => {
+      const response = await supertest(app)
+        .delete(`/api/orders/${cartId}`)
+        .set("Authorization", await getAuthHeader("test2@test.com"));
+
+      expect(response.status).toBe(401);
     });
   });
 
@@ -334,6 +472,7 @@ describe("Orders route tests", () => {
 
       const response = await supertest(app)
         .post("/api/orders")
+        .set("Authorization", await getAuthHeader())
         .send({
           items: products.map((product) => ({
             productId: product.id,
@@ -344,15 +483,25 @@ describe("Orders route tests", () => {
       cartId = response.body.id;
     });
 
+    it("not checkout a cart without authentication", async () => {
+      const response = await supertest(app).post(
+        `/api/orders/${cartId}/checkout`
+      );
+
+      expect(response.status).toBe(401);
+    });
+
     it("checkout a cart", async () => {
       const response = await supertest(app)
         .post(`/api/orders/${cartId}/checkout`)
+        .set("Authorization", await getAuthHeader())
         .send({});
 
       expect(response.status).toBe(200);
       expect(response.body).toEqual({
         id: expect.any(String),
         status: "SENT",
+        userId: expect.any(String),
         CartEntries: expect.arrayContaining([
           expect.objectContaining({
             product: expect.objectContaining({
@@ -368,18 +517,21 @@ describe("Orders route tests", () => {
     });
 
     it("returns 404 if cart does not exist", async () => {
-      const response = await supertest(app).post(
-        `/api/orders/invalid-id/checkout`
-      );
+      const response = await supertest(app)
+        .post(`/api/orders/invalid-id/checkout`)
+        .set("Authorization", await getAuthHeader());
 
       expect(response.status).toBe(404);
     });
 
     it("returns 400 if cart is empty", async () => {
-      const originalOrder = await supertest(app).get(`/api/orders/${cartId}`);
+      const originalOrder = await supertest(app)
+        .get(`/api/orders/${cartId}`)
+        .set("Authorization", await getAuthHeader());
 
-      const deleteEntrierResponse = await supertest(app)
+      await supertest(app)
         .patch(`/api/orders/${cartId}`)
+        .set("Authorization", await getAuthHeader())
         .send({
           items: originalOrder.body.CartEntries.map((entry: any) => ({
             productId: entry.productId,
@@ -387,22 +539,22 @@ describe("Orders route tests", () => {
           })),
         });
 
-      const response = await supertest(app).post(
-        `/api/orders/${cartId}/checkout`
-      );
+      const response = await supertest(app)
+        .post(`/api/orders/${cartId}/checkout`)
+        .set("Authorization", await getAuthHeader());
       expect(response.status).toBe(400);
     });
 
     it("returns 400 if the cart not open", async () => {
-      const firstResponse = await supertest(app).post(
-        `/api/orders/${cartId}/checkout`
-      );
+      const firstResponse = await supertest(app)
+        .post(`/api/orders/${cartId}/checkout`)
+        .set("Authorization", await getAuthHeader());
 
       expect(firstResponse.status).toBe(200);
 
-      const secondResponse = await supertest(app).post(
-        `/api/orders/${cartId}/checkout`
-      );
+      const secondResponse = await supertest(app)
+        .post(`/api/orders/${cartId}/checkout`)
+        .set("Authorization", await getAuthHeader());
 
       expect(secondResponse.status).toBe(400);
     });
@@ -410,6 +562,7 @@ describe("Orders route tests", () => {
     it("returns 400 for updating the cart after checkout", async () => {
       const response = await supertest(app)
         .post(`/api/orders/${cartId}/checkout`)
+        .set("Authorization", await getAuthHeader())
         .send({});
 
       expect(response.status).toBe(200);
@@ -418,6 +571,7 @@ describe("Orders route tests", () => {
 
       const updateResponse = await supertest(app)
         .patch(`/api/orders/${cartId}`)
+        .set("Authorization", await getAuthHeader())
         .send({
           items: [
             {
@@ -428,6 +582,15 @@ describe("Orders route tests", () => {
         });
 
       expect(updateResponse.status).toBe(400);
+    });
+
+    it("returns 401 if cart does not belong to user", async () => {
+      const response = await supertest(app)
+        .post(`/api/orders/${cartId}/checkout`)
+        .set("Authorization", await getAuthHeader("test2@test.com"))
+        .send({});
+
+      expect(response.status).toBe(401);
     });
   });
 });

@@ -3,10 +3,12 @@ import { BadRequestError, NotFoundError } from "../error/errors";
 import { calculatePrice, filterExistingProducts } from "./product";
 
 export async function createNewCart(
-  items: { productId: string; quantity: number }[]
+  items: { productId: string; quantity: number }[],
+  userId: string
 ) {
   const cart = await prisma.cart.create({
     data: {
+      userId: userId,
       CartEntries: {
         create: items.map((item) => ({
           productId: item.productId,
@@ -17,6 +19,7 @@ export async function createNewCart(
     select: {
       id: true,
       status: true,
+      userId: true,
       CartEntries: {
         select: {
           product: {
@@ -43,6 +46,7 @@ export async function getCart(id: string) {
     select: {
       id: true,
       status: true,
+      userId: true,
       CartEntries: {
         select: {
           product: {
@@ -139,6 +143,7 @@ export async function updateCart(
     select: {
       id: true,
       status: true,
+      userId: true,
       CartEntries: {
         select: {
           product: {
@@ -168,6 +173,7 @@ export async function cancelCart(id: string) {
     select: {
       id: true,
       status: true,
+      userId: true,
       CartEntries: {
         select: {
           product: {
@@ -195,6 +201,7 @@ export async function checkoutCart(id: string) {
     select: {
       id: true,
       status: true,
+      userId: true,
       CartEntries: {
         select: {
           product: {

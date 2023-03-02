@@ -1,4 +1,5 @@
 import { Router, Request, Response } from "express";
+import { authMiddleware } from "../auth/authMiddleware";
 import {
   cancelCart,
   checkoutCart,
@@ -7,7 +8,8 @@ import {
   updateCart,
 } from "../controllers/cart";
 import { filterExistingProducts } from "../controllers/product";
-import { BadRequestError } from "../error/errors";
+import { getTokenFromRequest } from "../controllers/user";
+import { BadRequestError, UnauthorizedError } from "../error/errors";
 import { createCartSchema, updateCartSchema } from "../validation/schemas";
 import { validatationHandler } from "../validation/validationMiddleware";
 
@@ -16,6 +18,7 @@ const router = Router();
 router.post(
   "/",
   validatationHandler(createCartSchema),
+  authMiddleware,
   async (req: Request, res: Response) => {
     const { items }: { items: { productId: string; quantity: number }[] } =
       req.body;
@@ -30,26 +33,39 @@ router.post(
       throw new BadRequestError("No valid items");
     }
 
-    const cart = await createNewCart(existingItems);
+    const { id } = getTokenFromRequest(req);
+
+    const cart = await createNewCart(existingItems, id);
 
     res.send(cart);
   }
 );
 
-router.get("/:id", async (req: Request, res: Response) => {
+router.get("/:id", authMiddleware, async (req: Request, res: Response) => {
   const { id } = req.params;
   const cart = await getCart(id);
+
+  const { id: userId } = getTokenFromRequest(req);
+  if (cart.userId !== userId) {
+    throw new UnauthorizedError();
+  }
   res.send(cart);
 });
 
 router.patch(
   "/:id",
   validatationHandler(updateCartSchema),
+  authMiddleware,
   async (req: Request, res: Response) => {
     const { id } = req.params;
     const { items } = req.body;
 
-    await getCart(id);
+    const cart = await getCart(id);
+
+    const { id: userId } = getTokenFromRequest(req);
+    if (cart.userId !== userId) {
+      throw new UnauthorizedError();
+    }
 
     const updatedCart = await updateCart(id, items);
 
@@ -57,24 +73,36 @@ router.patch(
   }
 );
 
-router.delete("/:id", async (req: Request, res: Response) => {
+router.delete("/:id", authMiddleware, async (req: Request, res: Response) => {
   const { id } = req.params;
-  await getCart(id);
+  const oldCart = await getCart(id);
+  const { id: userId } = getTokenFromRequest(req);
+  if (oldCart.userId !== userId) {
+    throw new UnauthorizedError();
+  }
   const cart = await cancelCart(id);
   res.send(cart);
 });
 
-router.post("/:id/checkout", async (req: Request, res: Response) => {
-  const { id } = req.params;
-  const openCart = await getCart(id);
-  if (openCart.status !== "OPEN") {
-    throw new BadRequestError("Cart is not open");
+router.post(
+  "/:id/checkout",
+  authMiddleware,
+  async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const openCart = await getCart(id);
+    const { id: userId } = getTokenFromRequest(req);
+    if (openCart.userId !== userId) {
+      throw new UnauthorizedError();
+    }
+    if (openCart.status !== "OPEN") {
+      throw new BadRequestError("Cart is not open");
+    }
+    if (openCart.CartEntries.length === 0) {
+      throw new BadRequestError("Cart is empty");
+    }
+    const cart = await checkoutCart(id);
+    res.send(cart);
   }
-  if (openCart.CartEntries.length === 0) {
-    throw new BadRequestError("Cart is empty");
-  }
-  const cart = await checkoutCart(id);
-  res.send(cart);
-});
+);
 
 export default router;

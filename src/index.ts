@@ -5,7 +5,7 @@ import logger from "./log/logger";
 dotenv.config();
 
 const start = () => {
-  const requiredEnvVars = ["PORT"];
+  const requiredEnvVars = ["PORT", "DATABASE_URL", "JWT_SECRET"];
 
   requiredEnvVars.forEach((envVar) => {
     if (!process.env[envVar]) {

@@ -24,3 +24,25 @@ export const updateCartSchema = z.object({
     ),
   }),
 });
+
+const passwordSchema = z
+  .string()
+  .min(8)
+  .regex(/[a-z]/)
+  .regex(/[A-Z]/)
+  .regex(/[0-9]/);
+
+export const loginSchema = z.object({
+  body: z.object({
+    email: z.string().email(),
+    password: passwordSchema,
+  }),
+});
+
+export const registerSchema = z.object({
+  body: z.object({
+    email: z.string().email(),
+    password: passwordSchema,
+    passwordConfirmation: passwordSchema,
+  }),
+});

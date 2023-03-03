@@ -8,51 +8,39 @@ datasource db {
 }
 
 model Category {
-  id       String    @id @default(cuid())
-  parentId String?   @map("parent_id")
-  parent   Category? @relation("CategoryToCategory", fields: [parentId], references: [id])
-  name     String    @unique
-
+  id              String     @id @default(cuid())
+  parentId        String?    @map("parent_id")
+  name            String     @unique
+  parent          Category?  @relation("CategoryToCategory", fields: [parentId], references: [id])
   childCategories Category[] @relation("CategoryToCategory")
   products        Product[]
 }
 
 model Product {
-  id          String @id @default(cuid())
+  id          String        @id @default(cuid())
   name        String
   description String
   price       Int
   categoryId  String
-
-  category Category @relation(fields: [categoryId], references: [id])
-
   CartEntries CartEntries[]
-}
-
-enum CartStatus {
-  OPEN
-  SENT
-  CANCELLED
-  PAID
+  category    Category      @relation(fields: [categoryId], references: [id])
 }
 
 model Cart {
-  id     String @id @default(cuid())
-  userId String
-
+  id          String        @id @default(cuid())
   status      CartStatus    @default(OPEN)
-  CartEntries CartEntries[]
+  userId      String
   user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  CartEntries CartEntries[]
 }
 
 model CartEntries {
-  id        String @id @default(cuid())
+  id        String  @id @default(cuid())
   productId String
   quantity  Int
   cartId    String
-
-  product Product @relation(fields: [productId], references: [id])
-  cart    Cart    @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  cart      Cart    @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  product   Product @relation(fields: [productId], references: [id])
 }
 
 model User {
@@ -60,4 +48,11 @@ model User {
   email    String @unique
   password String
   Cart     Cart[]
+}
+
+enum CartStatus {
+  OPEN
+  SENT
+  CANCELLED
+  PAID
 }

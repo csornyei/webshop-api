@@ -2,6 +2,8 @@ import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 
 async function main() {
+  await prisma.category.deleteMany({});
+  await prisma.product.deleteMany({});
   await prisma.category.create({
     data: {
       name: "Fruit and vegetables",

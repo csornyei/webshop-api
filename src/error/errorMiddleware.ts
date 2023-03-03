@@ -1,4 +1,5 @@
 import { NextFunction, Request, Response } from "express";
+import logger from "../log/logger";
 import { BaseError } from "./errors";
 
 export function errorHandler(
@@ -11,7 +12,7 @@ export function errorHandler(
     return res.status(err.statusCode).send({ errors: err.serializeErrors() });
   }
 
-  console.error("Unknown error", err);
+  logger.error("unknown error", err);
   return res.status(500).send({
     errors: [{ message: "Something went wrong" }],
   });

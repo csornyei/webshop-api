@@ -8,7 +8,8 @@
     "dev": "nodemon --exec ts-node src/index.ts",
     "build": "tsc",
     "test": "jest",
-    "generate": "prisma generate"
+    "generate": "prisma generate",
+    "deploy:database": "prisma migrate deploy"
   },
   "keywords": [],
   "author": "Mate Mark Csornyei <mate@csornyei.com>",

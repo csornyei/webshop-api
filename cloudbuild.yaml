@@ -1,0 +1,46 @@
+tags:
+  - webshop-api
+
+steps:
+  - id: "BUILD"
+    name: "gcr.io/cloud-builders/docker"
+    args:
+      - "build"
+      - "-t"
+      - "eu.gcr.io/apps-378408/webshop/webshop-api:$COMMIT_SHA"
+      - "-t"
+      - "eu.gcr.io/apps-378408/webshop/webshop-api:latest"
+      - "--build-arg"
+      - DATABASE_URL=$$PROD_DATABASE_URL
+      - "."
+    secretEnv:
+      - "PROD_DATABASE_URL"
+
+  - id: "PUSH"
+    name: "gcr.io/cloud-builders/docker"
+    args:
+      - "push"
+      - "eu.gcr.io/apps-378408/webshop/webshop-api:latest"
+
+  - id: "DEPLOY"
+    name: "gcr.io/cloud-builders/gcloud"
+    entrypoint: "bash"
+    args:
+      - "-c"
+      - |
+        gcloud run deploy webshop-api \
+          --image eu.gcr.io/apps-378408/webshop/webshop-api:latest \
+          --platform managed \
+          --region europe-west4 \
+          --allow-unauthenticated \
+          --set-env-vars DATABASE_URL=$$PROD_DATABASE_URL,JWT_SECRET=$$PROD_JWT_SECRET
+    secretEnv:
+      - "PROD_DATABASE_URL"
+      - "PROD_JWT_SECRET"
+
+availableSecrets:
+  secretManager:
+    - versionName: "projects/430969323509/secrets/PROD_DATABASE_URL/versions/latest"
+      env: "PROD_DATABASE_URL"
+    - versionName: "projects/430969323509/secrets/auth_secret/versions/latest"
+      env: "PROD_JWT_SECRET"
